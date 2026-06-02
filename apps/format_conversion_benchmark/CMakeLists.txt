@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 2.8.12)
+if(POLICY CMP0048)
+  cmake_policy(SET CMP0048 NEW)
+endif()
+project(format_conversion_benchmark)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+file(GLOB SOURCE_CODE ${PROJECT_SOURCE_DIR}/*.cpp)
+add_executable(${PROJECT_NAME} ${SOURCE_CODE})
+
+# If building within the taco repo the target 'taco' will be available.
+if (TARGET taco)
+  set_target_properties("${PROJECT_NAME}" PROPERTIES OUTPUT_NAME "taco-${PROJECT_NAME}")
+  target_link_libraries(${PROJECT_NAME} LINK_PUBLIC taco)
+else()
+  # Otherwise rely on include dir being set externally
+  if (NOT TACO_INCLUDE_DIR)
+    if (DEFINED ENV{TACO_INCLUDE_DIR})
+      set(TACO_INCLUDE_DIR $ENV{TACO_INCLUDE_DIR})
+    endif()
+  endif()
+  if (TACO_INCLUDE_DIR)
+    include_directories(${TACO_INCLUDE_DIR})
+  endif()
+endif()
