@@ -92,11 +92,13 @@ int main(int argc, char** argv) {
 
   int repeat = 5; bool cold=false; vector<string> formats = {"csc","ell"};
   string outDir = "data/benchmarks";
+  bool dumpStorage = false;
   vector<string> files;
   for (int i=1;i<argc;i++){
     string s = argv[i];
     if (s=="--repeat" && i+1<argc) { repeat = stoi(argv[++i]); continue; }
     if (s=="--cold") { cold=true; continue; }
+    if (s=="--dump-storage") { dumpStorage=true; continue; }
     if (s=="--formats" && i+1<argc){ formats.clear(); string f=argv[++i]; string tmp; stringstream ss(f); while(getline(ss,tmp,',')) formats.push_back(tmp); continue; }
     if (s=="--out-dir" && i+1<argc) { outDir = argv[++i]; continue; }
     files.push_back(s);
@@ -229,6 +231,21 @@ int main(int argc, char** argv) {
       try {
         TensorStorage last = pack(type<double>(), dims, tgt, typedCoords, (const void*)valbuf, Literal::zero(type<double>()));
         storageBytes = last.getSizeInBytes();
+        if (dumpStorage) {
+          cerr << "Detailed Storage Breakdown for format " << fmtName << "\n";
+          cerr << "  Total getSizeInBytes(): " << storageBytes << " bytes\n";
+          const Index &idx = last.getIndex();
+          for (int mi = 0; mi < idx.numModeIndices(); ++mi) {
+            const ModeIndex &midx = idx.getModeIndex(mi);
+            cerr << "  Mode " << mi << ": numIndexArrays=" << midx.numIndexArrays() << "\n";
+            for (int ia = 0; ia < midx.numIndexArrays(); ++ia) {
+              const Array &arr = midx.getIndexArray(ia);
+              cerr << "    IndexArray[" << ia << "]: size=" << arr.getSize() << ", bytes_per_elem=" << arr.getType().getNumBytes() << ", total_bytes=" << (arr.getSize()*arr.getType().getNumBytes()) << "\n";
+            }
+          }
+          const Array &vals = last.getValues();
+          cerr << "  Values: size=" << vals.getSize() << ", bytes_per_elem=" << vals.getType().getNumBytes() << ", total_bytes=" << (vals.getSize()*vals.getType().getNumBytes()) << "\n";
+        }
       } catch (...) {
         cerr << "Warning: could not compute storage size for format " << fmtName << "\n";
       }

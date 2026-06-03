@@ -3,7 +3,7 @@
 
 Usage: python3 tools/sparskit_baseline.py [--repeat N] [--formats f1,f2,...]
     file1.mtx [file2.mtx ...]
-Produces CSV with header: matrix,format,mean_ms
+Produces CSV with header: matrix,format,mean_ms,storage_bytes
 """
 import sys
 import argparse
@@ -62,6 +62,30 @@ def time_conversion(mat, fmt, repeat):
     raise ValueError('Unsupported format: %s' % fmt)
 
 
+def compute_storage_bytes(mat, fmt):
+    """Estimate storage bytes for the given SciPy matrix in the target format.
+    """
+    if fmt == 'csr':
+        M = mat.tocsr()
+        return int(M.data.nbytes + M.indices.nbytes + M.indptr.nbytes)
+    if fmt == 'csc':
+        M = mat.tocsc()
+        return int(M.data.nbytes + M.indices.nbytes + M.indptr.nbytes)
+    if fmt == 'coo':
+        M = mat.tocoo()
+        return int(M.data.nbytes + M.row.nbytes + M.col.nbytes)
+    if fmt == 'ell':
+        coo = mat.tocoo()
+        nrows = int(mat.shape[0])
+        rows = [[] for _ in range(nrows)]
+        for r, c, v in zip(coo.row, coo.col, coo.data):
+            rows[int(r)].append((int(c), float(v)))
+        maxPerRow = max((len(rw) for rw in rows), default=0)
+        M = maxPerRow * nrows
+        return int(M * (np.dtype(np.int32).itemsize + np.dtype(np.float64).itemsize))
+    return 0
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--repeat', type=int, default=5)
@@ -85,15 +109,16 @@ def main():
         for fmt in formats:
             try:
                 mean_ms = time_conversion(mat, fmt, args.repeat)
+                storage_bytes = compute_storage_bytes(mat, fmt)
             except Exception as e:
                 sys.stderr.write('Conversion failed for %s -> %s: %s\n' % (f, fmt, e))
                 continue
-            rows.append({'matrix': f, 'format': fmt, 'mean_ms': '%.6f' % mean_ms})
-            sys.stdout.write('Measured %s %s: %.6f ms\n' % (f, fmt, mean_ms))
+            rows.append({'matrix': f, 'format': fmt, 'mean_ms': '%.6f' % mean_ms, 'storage_bytes': str(int(storage_bytes))})
+            sys.stdout.write('Measured %s %s: %.6f ms, storage: %d B\n' % (f, fmt, mean_ms, storage_bytes))
 
     # write CSV
     with open(args.out, 'w', newline='') as csvf:
-        writer = csv.DictWriter(csvf, fieldnames=['matrix', 'format', 'mean_ms'])
+        writer = csv.DictWriter(csvf, fieldnames=['matrix', 'format', 'mean_ms', 'storage_bytes'])
         writer.writeheader()
         for r in rows:
             writer.writerow(r)

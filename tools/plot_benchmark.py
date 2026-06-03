@@ -36,6 +36,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('csv')
     p.add_argument('--baseline', help='optional baseline CSV')
+    p.add_argument('--y', default='mean_ms', help='CSV column to plot (default: mean_ms)')
     p.add_argument('-o','--out', default='benchmark.png')
     args = p.parse_args()
 
@@ -50,28 +51,46 @@ def main():
     if nmat == 1:
         axes = [axes]
 
+    ycol = args.y
+
     for ax, (matrix, entries) in zip(axes, grouped.items()):
         # sort by format name
         entries_sorted = sorted(entries, key=lambda e: e['format'])
         formats = [e['format'] for e in entries_sorted]
-        means = [float(e.get('mean_ms', e.get('mean', 0))) for e in entries_sorted]
-        errs = [float(e.get('stdev_ms', 0)) for e in entries_sorted]
+        # read numeric values from chosen column; missing -> nan
+        def tofloat(v):
+            try:
+                return float(v)
+            except Exception:
+                return float('nan')
+
+        means = [tofloat(e.get(ycol, e.get('mean_ms', e.get('mean', 'nan')))) for e in entries_sorted]
         x = np.arange(len(formats))
         width = 0.35
-        # Plot taco bars (no edge lines to avoid dark outlines)
-        ax.bar(x - width/2, means, width, yerr=errs, label='taco', edgecolor='none', color='C0')
+        # Plot taco bars (no edge lines and no error bars so no vertical line appears)
+        ax.bar(x - width/2, means, width, label='taco', edgecolor='none', color='C0')
 
         if baseline:
-            # find baseline entries for this matrix
-            bmap = { (b['matrix'], b['format']): float(b['mean_ms']) for b in baseline }
-            bmeans = [bmap.get((matrix, f), np.nan) for f in formats]
+            # find baseline entries for this matrix using the same y column when available
+            bmap = {}
+            for b in baseline:
+                key = (b.get('matrix'), b.get('format'))
+                bmap[key] = tofloat(b.get(ycol, b.get('mean_ms', b.get('mean', 'nan'))))
+            bmeans = [bmap.get((matrix, f), float('nan')) for f in formats]
             # Convert NaNs to masked values so matplotlib won't draw bars or lines
             bmeans_masked = [np.nan if np.isnan(v) else v for v in bmeans]
             ax.bar(x + width/2, bmeans_masked, width, label='baseline', edgecolor='none', color='C1')
 
         ax.set_xticks(x)
         ax.set_xticklabels(formats)
-        ax.set_ylabel('mean (ms)')
+        # Y axis label based on chosen column
+        if ycol == 'mean_ms':
+            ylabel = 'mean (ms)'
+        elif ycol == 'storage_bytes':
+            ylabel = 'storage (B)'
+        else:
+            ylabel = ycol
+        ax.set_ylabel(ylabel)
         ax.set_title(matrix)
         # Improve aesthetics: remove top/right spines and add subtle grid
         ax.spines['top'].set_visible(False)
