@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  int repeat = 5; bool cold=false; vector<string> formats = {"csr","csc","coo"};
+  int repeat = 5; bool cold=false; vector<string> formats = {"csc","ell"};
   string outDir = "data/benchmarks";
   vector<string> files;
   for (int i=1;i<argc;i++){

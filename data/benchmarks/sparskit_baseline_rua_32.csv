@@ -1,0 +1,3 @@
+matrix,format,mean_ms
+data/matrices/rua_32.mtx,csc,0.136250
+data/matrices/rua_32.mtx,ell,0.040168

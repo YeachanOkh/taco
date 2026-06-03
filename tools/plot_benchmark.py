@@ -58,18 +58,25 @@ def main():
         errs = [float(e.get('stdev_ms', 0)) for e in entries_sorted]
         x = np.arange(len(formats))
         width = 0.35
-        ax.bar(x - width/2, means, width, yerr=errs, label='taco')
+        # Plot taco bars (no edge lines to avoid dark outlines)
+        ax.bar(x - width/2, means, width, yerr=errs, label='taco', edgecolor='none', color='C0')
 
         if baseline:
             # find baseline entries for this matrix
             bmap = { (b['matrix'], b['format']): float(b['mean_ms']) for b in baseline }
             bmeans = [bmap.get((matrix, f), np.nan) for f in formats]
-            ax.bar(x + width/2, bmeans, width, label='baseline')
+            # Convert NaNs to masked values so matplotlib won't draw bars or lines
+            bmeans_masked = [np.nan if np.isnan(v) else v for v in bmeans]
+            ax.bar(x + width/2, bmeans_masked, width, label='baseline', edgecolor='none', color='C1')
 
         ax.set_xticks(x)
         ax.set_xticklabels(formats)
         ax.set_ylabel('mean (ms)')
         ax.set_title(matrix)
+        # Improve aesthetics: remove top/right spines and add subtle grid
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.grid(axis='y', linestyle='--', alpha=0.3)
         ax.legend()
 
     plt.tight_layout()
